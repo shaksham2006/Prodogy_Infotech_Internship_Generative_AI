@@ -1,37 +1,71 @@
-pip install transformers datasets torch
-from transformers import GPT2Tokenizer, GPT2LMHeadModel, Trainer, TrainingArguments, TextDataset, DataCollatorForLanguageModeling
+pip install transformers datasets
+from transformers import GPT2Tokenizer, GPT2LMHeadModel, TextDataset, DataCollatorForLanguageModeling, Trainer, TrainingArguments
 import torch
+
+# 1. Load GPT-2 and Tokenizer
 model_name = "gpt2"
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 model = GPT2LMHeadModel.from_pretrained(model_name)
-Once upon a time, in a faraway land, there lived a wise old owl...
-def load_dataset(file_path, tokenizer):
+
+# 2. Create Dataset (Save your dataset in a .txt file, e.g., 'custom.txt')
+def load_dataset(file_path):
     return TextDataset(
         tokenizer=tokenizer,
         file_path=file_path,
         block_size=128
     )
 
-train_dataset = load_dataset("train.txt", tokenizer)
-data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-training_args = TrainingArguments(
-    output_dir="./gpt2-textgen",
-    overwrite_output_dir=True,
-    num_train_epochs=3,
-    per_device_train_batch_size=2,
-    save_steps=500,
-    save_total_limit=2
-)
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    data_collator=data_collator,
-    train_dataset=train_dataset
-)
+# 3. Data Collator
+def get_data_collator():
+    return DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, mlm=False
+    )
 
-trainer.train()
-prompt = "Once upon a time"
-input_ids = tokenizer.encode(prompt, return_tensors='pt')
-output = model.generate(input_ids, max_length=100, num_return_sequences=1)
+# 4. Train Model
+def train(dataset_path, output_dir):
+    dataset = load_dataset(dataset_path)
+    data_collator = get_data_collator()
 
-print(tokenizer.decode(output[0], skip_special_tokens=True))
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        overwrite_output_dir=True,
+        num_train_epochs=1,
+        per_device_train_batch_size=2,
+        save_steps=10_000,
+        save_total_limit=2,
+        logging_steps=200,
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=dataset,
+    )
+
+    trainer.train()
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+# 5. Generate Text
+def generate(prompt, model_dir):
+    tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
+    model = GPT2LMHeadModel.from_pretrained(model_dir)
+
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(
+        inputs["input_ids"],
+        max_length=100,
+        num_return_sequences=1,
+        no_repeat_ngram_size=2,
+        early_stopping=True
+    )
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+# ==== RUN HERE ====
+
+# Step 1: Train the model (ensure 'custom.txt' is in your dir)
+# train("custom.txt", "gpt2-finetuned")
+
+# Step 2: Generate text after training
+print(generate("Once upon a time", "gpt2"))
