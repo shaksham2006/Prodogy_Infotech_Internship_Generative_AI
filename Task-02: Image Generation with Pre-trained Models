@@ -1,19 +1,23 @@
-pip install diffusers transformers torch accelerate
-import torch
+!pip install diffusers transformers accelerate torch safetensors --quiet
+
 from diffusers import StableDiffusionPipeline
+import torch
+from PIL import Image
 
-# Load model from Hugging Face
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
-).to("cuda")  # Use "cpu" if no GPU
+# Load the model
+model_id = "runwayml/stable-diffusion-v1-5"
+pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16, use_safetensors=True)
+pipe = pipe.to("cuda")
 
-# Define your prompt
-prompt = "A futuristic city with flying cars at sunset"
-
-# Generate the image
+# Generate an image
+prompt = "A Temple, high detail"
 image = pipe(prompt).images[0]
 
-# Save image
-image.save("generated_image.png")
+# Show and save
 image.show()
+image.save("output_image.png")
+
+from IPython.display import display
+
+display(image)  # ✅ Shows the image directly in the notebook
+
